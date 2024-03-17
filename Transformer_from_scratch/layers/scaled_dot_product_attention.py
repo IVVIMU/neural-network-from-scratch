@@ -20,8 +20,9 @@ class ScaledDotProductAttention(nn.Module):
         batch_size, n_heads, seq_len, d_head = k.size()
 
         # 1. dot product Query with Key^T to compute similarity
-        k_t = k.transpose(2, 3) # [batch_size, n_heads, d_head, seq_len]
-        score = (q @ k_t) / math.sqrt(d_head) # scaled dot-product
+        k_t = k.transpose(2, 3)  # [batch_size, n_heads, d_head, seq_len]
+        # q @ k_t -> [batch_size, n_heads, seq_len, seq_len]
+        score = (q @ k_t) / math.sqrt(d_head)  # scaled dot-product
 
         # 2. apply masking (opt)
         if mask is not None:
@@ -31,6 +32,7 @@ class ScaledDotProductAttention(nn.Module):
         score = self.softmax(score)
 
         # 4. multiply with Value
+        # score @ v -> [batch_size, n_heads, seq_len, d_head]
         v = score @ v
 
         return v, score
