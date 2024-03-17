@@ -1,5 +1,6 @@
 import torch.nn as nn
 
+
 class TokenEmbedding(nn.Embedding):
     """
     Token Embedding using torch.nn
