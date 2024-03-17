@@ -35,7 +35,7 @@ class PositionalEmbedding(nn.Module):
         super(PositionalEmbedding, self).__init__()
         self.embed_dim = embed_dim
 
-        pe = torch.zeros(seq_len, embed_dim)
+        pe = torch.zeros(seq_len, self.embed_dim)
         for pos in range(seq_len):
             for i in range(0, self.embed_dim, 2):
                 pe[pos, i] = math.sin(pos / 10000 ** ((2 * i) / self.embed_dim))
@@ -71,15 +71,15 @@ class MultiHeadAttention(nn.Module):
 
         self.embed_dim = embed_dim
         self.n_heads = n_heads
-        self.head_dim = embed_dim // n_heads
+        self.head_dim = self.embed_dim // self.n_heads
 
-        assert (self.head_dim * n_heads == embed_dim), "Embedding dimension needs to be divisible by n_heads"
+        assert (self.head_dim * self.n_heads == self.embed_dim), "Embedding dimension needs to be divisible by n_heads"
 
         # query, key and value matrix
         self.query_matrix = nn.Linear(self.head_dim, self.head_dim, bias=False)
-        self.key_matrix = nn.Linear(self.head_dimm, self.head_dim, bias=False)
+        self.key_matrix = nn.Linear(self.head_dim, self.head_dim, bias=False)
         self.value_matrix = nn.Linear(self.head_dim, self.head_dim, bias=False)
-        self.fc_out = nn.Linear(self.n_heads * self.head_dim, embed_dim)
+        self.fc_out = nn.Linear(self.n_heads * self.head_dim, self.embed_dim)
 
     def forward(self, query, key, value, mask=None):
         """
@@ -102,8 +102,8 @@ class MultiHeadAttention(nn.Module):
         # when n_heads=8
         # [batch_size, seq_len, n_heads, head_dim] -> [32, 10, 8, 64]
         query = query.view(batch_size, seq_len_query, self.n_heads, self.head_dim)
-        key = key.view(batch_size, seq_len, self.heads, self.head_dim)
-        value = value.view(batch_size, seq_len, self.heads, self.head_dim)
+        key = key.view(batch_size, seq_len, self.n_heads, self.head_dim)
+        value = value.view(batch_size, seq_len, self.n_heads, self.head_dim)
 
         Q = self.query_matrix(query)
         K = self.key_matrix(key)
@@ -168,7 +168,7 @@ class TransformerBlock(nn.Module):
 class Encoder(nn.Module):
     """
     Args:
-        vocab_size: size of vocabulary
+        src_vocab_size: vocabulary size of source
         embed_dim: dimension of embedding
         seq_len: length of input sequence
         n_heads: number of heads in multi-head attention
@@ -181,7 +181,7 @@ class Encoder(nn.Module):
     """
     def __init__(
             self,
-            vocab_size,
+            src_vocab_size,
             embed_dim,
             seq_len,
             n_heads,
@@ -191,7 +191,7 @@ class Encoder(nn.Module):
     ):
         super(Encoder, self).__init__()
 
-        self.embedding_layer = Embedding(vocab_size, embed_dim)
+        self.word_embedding = Embedding(src_vocab_size, embed_dim)
         self.position_encoder = PositionalEmbedding(seq_len, embed_dim)
 
         self.layers = nn.ModuleList(
@@ -207,7 +207,7 @@ class Encoder(nn.Module):
         )
 
     def forward(self, x):
-        embed_out = self.embedding_layer(x)
+        embed_out = self.word_embedding(x)
         out = self.position_encoder(embed_out)
         for layer in self.layers:
             out = layer(out, out, out)
@@ -230,8 +230,8 @@ class DecoderBlock(nn.Module):
         self.transformer_block = TransformerBlock(
             embed_dim=embed_dim,
             n_heads=n_heads,
+            forward_expansion=forward_expansion,
             dropout=dropout,
-            forward_expansion=forward_expansion
         )
         self.dropout = nn.Dropout(dropout)
 
@@ -308,9 +308,9 @@ class Decoder(nn.Module):
         out = self.dropout(out)
 
         for layer in self.layers:
-            out = layer(query=enc_out, key=enc_out, value=out, mask=mask)
+            out = layer(enc_out, enc_out, out, mask)
 
-        out = F.softmax(self.fc_out(out))
+        out = F.softmax(self.fc_out(out), dim=-1)
         return out
 
 
@@ -319,87 +319,114 @@ class Transformer(nn.Module):
             self,
             src_vocab_size,
             trg_vocab_size,
-            src_pad_idx,
-            trg_pad_idx,
-            embed_size=256,
-            num_layers=6,
+            embed_dim,
+            seq_len,
+            n_heads=4,
+            n_layers=2,
             forward_expansion=4,
-            heads=8,
-            dropout=0,
-            device="cuda",
-            max_length=100
+            dropout=0.2,
+
     ):
         super(Transformer, self).__init__()
 
+        self.trg_vocab_size = trg_vocab_size
+
         self.encoder = Encoder(
             src_vocab_size=src_vocab_size,
-            embed_size=embed_size,
-            num_layers=num_layers,
-            heads=heads,
-            device=device,
+            embed_dim=embed_dim,
+            seq_len=seq_len,
+            n_heads=n_heads,
+            n_layers=n_layers,
             forward_expansion=forward_expansion,
-            dropout=dropout,
-            max_length=max_length
+            dropout=dropout
         )
 
         self.decoder = Decoder(
             trg_vocab_size=trg_vocab_size,
-            embed_size=embed_size,
-            num_layers=num_layers,
-            heads=heads,
+            embed_dim=embed_dim,
+            seq_len=seq_len,
+            n_heads=n_heads,
+            n_layers=n_layers,
             forward_expansion=forward_expansion,
-            dropout=dropout,
-            device=device,
-            max_length=max_length
+            dropout=dropout
         )
-
-        self.src_pad_idx = src_pad_idx
-        self.trg_pad_idx = trg_pad_idx
-        self.device = device
-
-    def make_src_mask(self, src):
-        # (N, 1, 1, src_len)
-        src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
-        return src_mask.to(self.device)
 
     def make_trg_mask(self, trg):
-        N, trg_len = trg.shape
-        trg_mask = torch.tril(torch.ones((trg_len, trg_len))).expand(
-            N, 1, trg_len, trg_len
+        batch_size, trg_len = trg.shape
+        device = trg.device
+        # return the lower triangular part of matrix filled with ones
+        trg_mask = torch.tril(torch.ones((trg_len, trg_len), device=device)).expand(
+            batch_size, 1, trg_len, trg_len
         )
-        return trg_mask.to(self.device)
+        return trg_mask
+
+    def decode(self, src, trg):
+        """
+        for inference
+
+        Args:
+            src: input to encoder
+            trg: input to decoder
+
+        Returns:
+            out_labels: returns final prediction of sequence
+        """
+        trg_mask = self.make_trg_mask(trg)
+        enc_out = self.encoder(src)
+        out_labels = []
+        batch_size, seq_len = src.shape[0], src.shape[1]
+
+        out = trg
+        for i in range(seq_len):
+            out = self.decoder(out, enc_out, mask=trg_mask)
+
+            # take the last token
+            out = out[:, -1, :]
+
+            out = out.argmax(-1)
+            print(out)
+            out_labels.append(out.item())
+            out = torch.unsqueeze(out, axis=0)
+
+        return out_labels
 
     def forward(self, src, trg):
-        src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
-        enc_src = self.encoder(src, src_mask)
-        out = self.decoder(trg, enc_src, src_mask, trg_mask)
+        enc_out = self.encoder(src)
+        out = self.decoder(trg, enc_out, trg_mask)
         return out
 
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    x = torch.tensor([
-        [1, 5, 6, 4, 3, 9, 5, 2, 0],
-        [1, 8, 7, 3, 4, 5, 6, 7, 2]
+    src = torch.tensor([
+        [1, 5, 6, 4, 3, 9, 5, 2, 0, 1],
+        [1, 8, 7, 3, 4, 5, 6, 7, 2, 4]
     ]).to(device)
 
     trg = torch.tensor([
-        [1, 7, 4, 3 ,5, 9 ,2, 0],
-        [1, 5, 6, 2, 4, 7, 6, 2]
+        [1, 7, 4, 3 ,5, 9 ,2, 0, 7, 8],
+        [1, 5, 6, 2, 4, 7, 6, 2, 4, 9]
     ]).to(device)
 
-    src_pad_idx = 0
-    trg_pad_idx = 0
-    src_vocab_size = 10
-    trg_vocab_size = 10
+    src_vocab_size = 12
+    trg_vocab_size = 12
     model = Transformer(
         src_vocab_size=src_vocab_size,
         trg_vocab_size=trg_vocab_size,
-        src_pad_idx=src_pad_idx,
-        trg_pad_idx=trg_pad_idx
+        embed_dim=256,
+        seq_len=12,
+        n_heads=2,
+        n_layers=2
     ).to(device)
-    out = model(x, trg[:, :-1])
+
+    out = model(src, trg)
     print(out.shape)
+
+    src = torch.tensor([[0, 2, 5, 6, 4, 3, 9, 5, 2, 9]]).to(device)
+    trg = torch.tensor([[4]]).to(device)
+    print(src.shape, trg.shape)
+    out_labels = model.decode(src, trg)
+    print(out_labels)
 
