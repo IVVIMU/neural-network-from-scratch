@@ -24,6 +24,7 @@ class Embedding(nn.Module):
         out = self.embed(x)
         return out
 
+
 class PositionalEmbedding(nn.Module):
     def __init__(self, seq_len, embed_dim):
         """
@@ -58,51 +59,76 @@ class PositionalEmbedding(nn.Module):
         x = x + self.pe[:, :seq_len]
         return x
 
-class SelfAttention(nn.Module):
-    def __init__(self, embed_size, heads):
-        super(SelfAttention, self).__init__()
-        self.embed_size = embed_size
-        self.heads = heads
-        self.head_dim = embed_size // heads
 
-        assert (self.head_dim * heads == embed_size), "Embed size needs to be divisible by heads"
+class MultiHeadAttention(nn.Module):
+    def __init__(self, embed_dim, n_heads):
+        """
+        Args:
+            embed_dim: dimension of embedding vector output
+            n_heads: number of self attention heads
+        """
+        super(MultiHeadAttention, self).__init__()
 
-        self.values = nn.Linear(self.head_dim, self.head_dim, bias=False)
-        self.keys = nn.Linear(self.head_dim, self.head_dim, bias=False)
-        self.queries = nn.Linear(self.head_dim, self.head_dim, bias=False)
-        self.fc_out = nn.Linear(heads * self.head_dim, embed_size)
+        self.embed_dim = embed_dim
+        self.n_heads = n_heads
+        self.head_dim = embed_dim // n_heads
 
-    def forward(self, values, keys, query, mask):
-        N = query.shape[0]
-        value_len, key_len, query_len = values.shape[1], keys.shape[1], query.shape[1]
+        assert (self.head_dim * n_heads == embed_dim), "Embedding dimension needs to be divisible by n_heads"
 
-        # Split embedding into self.heads pieces
-        values = values.reshape(N, value_len, self.heads, self.head_dim)
-        keys = keys.reshape(N, key_len, self.heads, self.head_dim)
-        queries = query.reshape(N, query_len, self.heads, self.head_dim)
+        # query, key and value matrix
+        self.query_matrix = nn.Linear(self.head_dim, self.head_dim, bias=False)
+        self.key_matrix = nn.Linear(self.head_dimm, self.head_dim, bias=False)
+        self.value_matrix = nn.Linear(self.head_dim, self.head_dim, bias=False)
+        self.fc_out = nn.Linear(self.n_heads * self.head_dim, embed_dim)
 
-        values = self.values(values)
-        keys = self.keys(keys)
-        queries = self.queries(queries)
+    def forward(self, query, key, value, mask=None):
+        """
+        Args:
+            query: query vector
+            key: key vector
+            value: value vector
+            mask: mask for encoder
 
-        # queries shape: (N, query_len, heads, heads_dim)
-        # key shape: (N, key_len, heads, heads_dim)
-        # energy shape: (N, heads, query_len, key_len)
-        energy = torch.einsum("nqhd,nkhd->nhqk", [queries, keys])
+        Returns:
+            out: output vector from multi-head attention
+        """
+        batch_size = key.size(0)
+        seq_len = key.size(1)
 
+        # query dimension can change in decoder during inference
+        seq_len_query = query.size(1)
+
+        # suppose [batch_size, seq_len, embed_dim] -> [32, 10, 512]
+        # when n_heads=8
+        # [batch_size, seq_len, n_heads, head_dim] -> [32, 10, 8, 64]
+        query = query.view(batch_size, seq_len_query, self.n_heads, self.head_dim)
+        key = key.view(batch_size, seq_len, self.heads, self.head_dim)
+        value = key.view(batch_size, seq_len, self.heads, self.head_dim)
+
+        Q = self.query_matrix(query)
+        K = self.key_matrix(key)
+        V = self.value_matrix(value)
+
+        # [batch_size, n_heads, seq_len, head_dim] -> [32, 8, 10, 64]
+        Q = Q.transpose(1, 2)
+        K = K.transpose(1, 2)
+        V = V.transpose(1, 2)
+
+        # compute attention
+        K = K.transpose(-1, -2) # [batch_size, n_heads, head_dim, seq_len] -> [32, 8, 64, 10]
+        dot_product = torch.matmul(Q, K) # [32, 8, 10, 64] x [32, 8, 64, 10]
+
+        # masking
         if mask is not None:
-            energy = energy.masked_fill(mask == 0, float("-1e20"))
+            dot_product = dot_product.masked_fill(mask == 0, float("-1e20"))
 
-        attention = torch.softmax(energy / (self.embed_size ** (1/2)), dim=3)
+        dot_product = dot_product / math.sqrt(self.head_dim)
+        scores = F.softmax(dot_product, dim=-1)
+        scores = torch.matmul(scores, V) # [32, 8, 10, 10] x [32, 8, 10, 64]
+        # [32, 8, 10, 64] -> [32, 10, 8, 64] -> [32, 10, 512]
+        concat = scores.transpose(1, 2).contiguous().view(batch_size, seq_len_query, self.n_heads * self.head_dim)
 
-        # attention shape: (N, heads, query_len, key_len)
-        # values shape: (N, value_len, heads, head_dim)
-        # after einsum (N, query_len, heads, head_dim) then flatten last two dimensions
-        out = torch.einsum("nhql,nlhd->nqhd", [attention, values]).reshape(
-            N, query_len, self.heads * self.head_dim
-        )
-
-        out = self.fc_out(out)
+        out = self.fc_out(concat)
         return out
 
 
