@@ -1,6 +1,62 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import math
 
+
+class Embedding(nn.Module):
+    def __init__(self, vocab_size, embed_dim):
+        """
+        Args:
+            vocab_size: size of vocabulary
+            embed_dim: dimension of embeddings
+        """
+        super(Embedding, self).__init__()
+        self.embed = nn.Embedding(vocab_size, embed_dim)
+
+    def forward(self, x):
+        """
+        Args:
+            x: input vector
+        Returns:
+            out: embedding vector
+        """
+        out = self.embed(x)
+        return out
+
+class PositionalEmbedding(nn.Module):
+    def __init__(self, seq_len, embed_dim):
+        """
+        Args:
+            seq_len: length of input sequence
+            embed_dim: dimension of embedding
+        """
+        super(PositionalEmbedding, self).__init__()
+        self.embed_dim = embed_dim
+
+        pe = torch.zeros(seq_len, embed_dim)
+        for pos in range(seq_len):
+            for i in range(0, self.embed_dim, 2):
+                pe[pos, i] = math.sin(pos / 10000 ** ((2 * i) / self.embed_dim))
+                pe[pos, i + 1] = math.cos(pos / 10000 ** ((2 * (i + 1)) / self.embed_dim))
+        # pe.shape -> [seq_len, embed_dim]
+        # unsqueeze(0) -> pe.shape -> [1, max_seq_len, embed_dim]
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+        Args:
+            x: input vector [batch_size, seq_len, embed_dim]
+        Returns:
+            x: output [batch_size, seq_len, embed_dim]
+        """
+        # Scaling Embedding
+        x = x * math.sqrt(self.embed_dim)
+        # Add Positional Encoding
+        seq_len = x.size(1)
+        x = x + self.pe[:, :seq_len]
+        return x
 
 class SelfAttention(nn.Module):
     def __init__(self, embed_size, heads):
