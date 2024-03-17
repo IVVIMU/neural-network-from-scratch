@@ -103,7 +103,7 @@ class MultiHeadAttention(nn.Module):
         # [batch_size, seq_len, n_heads, head_dim] -> [32, 10, 8, 64]
         query = query.view(batch_size, seq_len_query, self.n_heads, self.head_dim)
         key = key.view(batch_size, seq_len, self.heads, self.head_dim)
-        value = key.view(batch_size, seq_len, self.heads, self.head_dim)
+        value = value.view(batch_size, seq_len, self.heads, self.head_dim)
 
         Q = self.query_matrix(query)
         K = self.key_matrix(key)
@@ -133,88 +133,122 @@ class MultiHeadAttention(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, embed_size, heads, dropout, forward_expansion):
+    def __init__(self, embed_dim, n_heads, forward_expansion, dropout):
+        """
+        Args:
+            embed_dim: dimension of the embedding
+            n_heads: number of attention heads
+            forward_expansion: factor which determines output dimension of linear layer
+            dropout: rate of dropout
+        """
         super(TransformerBlock, self).__init__()
-        self.attention = SelfAttention(embed_size, heads)
-        self.norm1 = nn.LayerNorm(embed_size)
-        self.norm2 = nn.LayerNorm(embed_size)
+        self.attention = MultiHeadAttention(embed_dim=embed_dim, n_heads=n_heads)
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
 
         self.feed_forward = nn.Sequential(
-            nn.Linear(embed_size, forward_expansion * embed_size),
+            nn.Linear(embed_dim, forward_expansion * embed_dim),
             nn.ReLU(),
-            nn.Linear(forward_expansion * embed_size, embed_size)
+            nn.Linear(forward_expansion * embed_dim, embed_dim)
         )
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, value, key, query, mask):
-        attention = self.attention(value, key, query, mask)
+    def forward(self, query, key, value):
+        attention_out = self.attention(query=query, key=key, value=value)
+        attention_res_out = attention_out + value
+        norm1_out = self.dropout(self.norm1(attention_res_out))
 
-        x = self.dropout(self.norm1(attention + query))
-        forward = self.feed_forward(x)
-        out = self.dropout(self.norm2(forward + x))
-        return out
+        feed_fwd_out = self.feed_forward(norm1_out)
+        feed_fwd_res_out = feed_fwd_out + norm1_out
+        norm2_out = self.dropout(self.norm2(feed_fwd_res_out))
+        return norm2_out
 
 
 class Encoder(nn.Module):
+    """
+    Args:
+        vocab_size: size of vocabulary
+        embed_dim: dimension of embedding
+        seq_len: length of input sequence
+        n_heads: number of heads in multi-head attention
+        n_layers: number of encoder layer
+        forward_expansion: factor which determines of linear in feed forward layer
+        dropout: rate of dropout
+
+    Returns:
+        out: output of the encoder
+    """
     def __init__(
             self,
-            src_vocab_size,
-            embed_size,
-            num_layers,
-            heads,
-            device,
+            vocab_size,
+            embed_dim,
+            seq_len,
+            n_heads,
+            n_layers,
             forward_expansion,
-            dropout,
-            max_length
+            dropout=0.2
     ):
         super(Encoder, self).__init__()
-        self.embed_size = embed_size
-        self.device = device
-        self.word_embedding = nn.Embedding(src_vocab_size, embed_size)
-        self.position_embedding = nn.Embedding(max_length, embed_size)
+
+        self.embedding_layer = Embedding(vocab_size, embed_dim)
+        self.position_encoder = PositionalEmbedding(seq_len, embed_dim)
 
         self.layers = nn.ModuleList(
             [
                 TransformerBlock(
-                    embed_size=embed_size,
-                    heads=heads,
-                    dropout=dropout,
-                    forward_expansion=forward_expansion
+                    embed_dim=embed_dim,
+                    n_heads=n_heads,
+                    forward_expansion=forward_expansion,
+                    dropout=dropout
                 )
-                for _ in range(num_layers)
+                for _ in range(n_layers)
             ]
         )
-        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, mask):
-        N, seq_length = x.shape
-        positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
-
-        out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
-
+    def forward(self, x):
+        embed_out = self.embedding_layer(x)
+        out = self.position_encoder(embed_out)
         for layer in self.layers:
-            out = layer(out, out, out, mask)
+            out = layer(out, out, out)
+        return out
 
-            return out
 
 class DecoderBlock(nn.Module):
-    def __init__(self, embed_size, heads, forward_expansion, dropout, device):
+    def __init__(self, embed_dim, n_heads, forward_expansion, dropout=0.2):
+        """
+        Args:
+            embed_dim: dimension of embedding
+            n_heads: number of heads in multi-head attention
+            forward_expansion: factor which determines output dimension of linear layer
+            dropout: rate of dropout
+        """
         super(DecoderBlock, self).__init__()
-        self.attention = SelfAttention(embed_size, heads)
-        self.norm = nn.LayerNorm(embed_size)
+
+        self.attention = MultiHeadAttention(embed_dim=embed_dim, n_heads=n_heads)
+        self.norm = nn.LayerNorm(embed_dim)
         self.transformer_block = TransformerBlock(
-            embed_size,
-            heads,
-            dropout,
-            forward_expansion
+            embed_dim=embed_dim,
+            n_heads=n_heads,
+            dropout=dropout,
+            forward_expansion=forward_expansion
         )
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, value, key, src_mask, trg_mask):
-        attention = self.attention(x, x, x, trg_mask)
-        query = self.dropout(self.norm(attention + x))
-        out = self.transformer_block(value, key, query, src_mask)
+    def forward(self, query, key, x, mask):
+        """
+        Args:
+            query: query vector
+            key: key vector
+            x: decoder input
+            mask: mask to be given for multi-head attention
+
+        Returns:
+            out: output for transformer block
+        """
+        attention = self.attention(x, x, x, mask=mask)
+        value = self.dropout(self.norm(attention + x))
+        out = self.transformer_block(query=query, key=key, value=value)
         return out
 
 
@@ -222,44 +256,61 @@ class Decoder(nn.Module):
     def __init__(
             self,
             trg_vocab_size,
-            embed_size,
-            num_layers,
-            heads,
+            embed_dim,
+            seq_len,
+            n_heads,
+            n_layers,
             forward_expansion,
-            dropout,
-            device,
-            max_length
+            dropout=0.2,
     ):
+        """
+        Args:
+            trg_vocab_size: vocabulary size of target
+            embed_dim: dimension of embedding
+            seq_len: length of input sequence
+            n_heads: number of heads in multi-head attention
+            n_layers: number of decoder layer
+            forward_expansion: factor which determines number of layers in feed forward layer
+            dropout: rate of dropout
+        """
         super(Decoder, self).__init__()
-        self.device = device
-        self.word_embedding = nn.Embedding(trg_vocab_size, embed_size)
-        self.position_embedding = nn.Embedding(max_length, embed_size)
+
+        self.word_embedding = Embedding(trg_vocab_size, embed_dim)
+        self.position_encoder = PositionalEmbedding(seq_len, embed_dim)
 
         self.layers = nn.ModuleList(
             [
                 DecoderBlock(
-                    embed_size=embed_size,
-                    heads=heads,
+                    embed_dim=embed_dim,
+                    n_heads=n_heads,
                     forward_expansion=forward_expansion,
-                    dropout=dropout,
-                    device=device
+                    dropout=dropout
                 )
-                for _ in range(num_layers)
+                for _ in range(n_layers)
             ]
         )
 
-        self.fc_out = nn.Linear(embed_size, trg_vocab_size)
+        self.fc_out = nn.Linear(embed_dim, trg_vocab_size)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, enc_out, src_mask, trg_mask):
-        N, seq_length= x.shape
-        positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
-        x = self.dropout((self.word_embedding(x) + self.position_embedding(positions)))
+    def forward(self, x, enc_out, mask):
+        """
+        Args:
+            x: input vector from target
+            enc_out: output from encoder layer
+            mask: mask for decoder self attention
+
+        Returns:
+            out: output vector
+        """
+        embed_out = self.word_embedding(x)
+        out = self.position_encoder(embed_out)
+        out = self.dropout(out)
 
         for layer in self.layers:
-            x = layer(x, enc_out, enc_out, src_mask, trg_mask)
+            out = layer(query=enc_out, key=enc_out, value=out, mask=mask)
 
-        out = self.fc_out(x)
+        out = F.softmax(self.fc_out(out))
         return out
 
 
