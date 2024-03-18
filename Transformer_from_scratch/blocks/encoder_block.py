@@ -6,10 +6,10 @@ from layers.multi_head_attention import MultiHeadAttention
 from layers.position_wise_feed_forward import PositionWiseFeedForward
 
 
-class Encoder(nn.Module):
+class EncoderBlock(nn.Module):
 
     def __init__(self, d_model, ffn_hidden, n_heads, dropout):
-        super(Encoder, self).__init__()
+        super(EncoderBlock, self).__init__()
 
         self.attention = MultiHeadAttention(d_model=d_model, n_heads=n_heads)
         self.norm1 = LayerNorm(d_model=d_model)
