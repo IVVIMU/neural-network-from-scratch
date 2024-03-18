@@ -6,10 +6,10 @@ from layers.multi_head_attention import MultiHeadAttention
 from layers.position_wise_feed_forward import PositionWiseFeedForward
 
 
-class Decoder(nn.Module):
+class DecoderBlock(nn.Module):
 
     def __init__(self, d_model, ffn_hidden, n_heads, dropout):
-        super(Decoder, self).__init__()
+        super(DecoderBlock, self).__init__()
 
         self.attention = MultiHeadAttention(d_model=d_model, n_heads=n_heads)
         self.norm1 = LayerNorm(d_model=d_model)
