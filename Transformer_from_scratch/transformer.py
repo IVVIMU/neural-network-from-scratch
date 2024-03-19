@@ -59,6 +59,7 @@ class Transformer(nn.Module):
         return src_mask
 
     def make_trg_mask(self, trg):
+        # suppose trg -> [batch_size, seq_len]
         # trg_pad_mask -> [batch_size, 1, 1, seq_len]
         trg_pad_mask = (trg != self.trg_pad_idx).unsqueeze(1).unsqueeze(2)
         trg_len = trg.shape[1]
