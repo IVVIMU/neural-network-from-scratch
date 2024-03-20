@@ -11,6 +11,9 @@ min_cnt = 0
 # maximum number of words in a sentence
 max_seq_len = 50
 
+"""
+Data from https://github.com/P3n9W31/transformer-pytorch
+"""
 source_train = '../data/cn.txt'
 target_train = '../data/en.txt'
 source_test = '../data/en.test.txt'
