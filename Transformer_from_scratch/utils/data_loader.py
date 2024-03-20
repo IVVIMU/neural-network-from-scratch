@@ -4,20 +4,21 @@ import random
 import numpy as np
 import regex
 import requests
+import config
 
 
 # words whose occurred less than min_cnt are encoded as <UNK>
 min_cnt = 0
 # maximum number of words in a sentence
-max_seq_len = 50
+max_seq_len = config.max_seq_len
 
 """
 Data from https://github.com/P3n9W31/transformer-pytorch
 """
-source_train = '../data/cn.txt'
-target_train = '../data/en.txt'
-source_test = '../data/en.test.txt'
-target_test = '../data/en.test.txt'
+source_train = './data/cn.txt'
+target_train = './data/en.txt'
+source_test = './data/en.test.txt'
+target_test = './data/en.test.txt'
 
 
 def load_vocab(language):
@@ -81,13 +82,13 @@ def load_data(data_type):
     assert data_type in ['train', 'test']
 
     cn_sentences = [
-        regex.sub("[^\s\p{L}']", '', line)  # noqa W605
+        regex.sub(r"[^\s\p{L}']", '', line)  # noqa W605
         for line in codecs.open(source, 'r', 'utf-8').read().split('\n')
         if line and line[0] != '<'
     ]
 
     en_sentences = [
-        regex.sub("[^\s\p{L}']", '', line)  # noqa W605
+        regex.sub(r"[^\s\p{L}']", '', line)  # noqa W605
         for line in codecs.open(target, 'r', 'utf-8').read().split('\n')
         if line and line[0] != '<'
     ]
