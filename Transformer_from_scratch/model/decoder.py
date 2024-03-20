@@ -9,6 +9,7 @@ class Decoder(nn.Module):
 
     def __init__(
             self,
+            trg_pad_idx,
             trg_vocab_size,
             max_seq_len,
             d_model,
@@ -21,6 +22,7 @@ class Decoder(nn.Module):
         super().__init__()
 
         self.emb = TransformerEmbedding(
+            pad_idx=trg_pad_idx,
             vocab_size=trg_vocab_size,
             max_seq_len=max_seq_len,
             d_model=d_model,

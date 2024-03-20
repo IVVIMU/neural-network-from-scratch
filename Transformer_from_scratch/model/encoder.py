@@ -9,6 +9,7 @@ class Encoder(nn.Module):
 
     def __init__(
             self,
+            src_pad_idx,
             src_vocab_size,
             max_seq_len,
             d_model,
@@ -21,6 +22,7 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.emb = TransformerEmbedding(
+            pad_idx=src_pad_idx,
             vocab_size=src_vocab_size,
             max_seq_len=max_seq_len,
             d_model=d_model,

@@ -29,6 +29,7 @@ class Transformer(nn.Module):
         self.device = device
 
         self.encoder = Encoder(
+            src_pad_idx=src_pad_idx,
             src_vocab_size=src_vocab_size,
             max_seq_len=max_seq_len,
             d_model=d_model,
@@ -40,6 +41,7 @@ class Transformer(nn.Module):
         )
 
         self.decoder = Decoder(
+            trg_pad_idx=trg_pad_idx,
             trg_vocab_size=trg_vocab_size,
             max_seq_len=max_seq_len,
             d_model=d_model,

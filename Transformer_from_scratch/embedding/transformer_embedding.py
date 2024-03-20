@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from embedding.token_embedding import TokenEmbedding
+# from embedding.token_embedding import TokenEmbedding
 from embedding.positional_encoding import PositionalEncoding
 
 
@@ -11,7 +11,7 @@ class TransformerEmbedding(nn.Module):
     positional encoding can give positional information to network
     """
 
-    def __init__(self, vocab_size, d_model, max_seq_len, dropout, device):
+    def __init__(self, pad_idx, vocab_size, max_seq_len, d_model, dropout, device):
         """
         class for word embedding that included positional information
         :param vocab_size: size of vocabulary
@@ -22,7 +22,7 @@ class TransformerEmbedding(nn.Module):
         """
         super(TransformerEmbedding, self).__init__()
 
-        self.tok_emb = TokenEmbedding(vocab_size, d_model)
+        self.tok_emb = nn.Embedding(vocab_size, d_model, pad_idx)
         self.pos_emb = PositionalEncoding(d_model, max_seq_len, device)
         self.dropout = nn.Dropout(p=dropout)
 
