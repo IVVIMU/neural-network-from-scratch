@@ -10,7 +10,7 @@ class Transformer(nn.Module):
             self,
             src_pad_idx,
             trg_pad_idx,
-            trg_sos_idx,
+            # trg_sos_idx,
             src_vocab_size,
             trg_vocab_size,
             max_seq_len,
@@ -25,7 +25,7 @@ class Transformer(nn.Module):
 
         self.src_pad_idx = src_pad_idx
         self.trg_pad_idx = trg_pad_idx
-        self.trg_sos_idx = trg_sos_idx
+        # self.trg_sos_idx = trg_sos_idx
         self.device = device
 
         self.encoder = Encoder(
