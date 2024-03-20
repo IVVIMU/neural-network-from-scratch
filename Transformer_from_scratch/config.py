@@ -7,7 +7,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # model parameter setting
 batch_size = 128
 max_seq_len = 256
-d_model = 512,
+d_model = 512
 ffn_hidden = 1024
 n_heads = 8
 n_layers = 6

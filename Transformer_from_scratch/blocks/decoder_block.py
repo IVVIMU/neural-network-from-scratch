@@ -20,7 +20,7 @@ class DecoderBlock(nn.Module):
         self.dropout2 = nn.Dropout(p=dropout)
 
         self.ffn = PositionWiseFeedForward(d_model=d_model, hidden=ffn_hidden, dropout=dropout)
-        self.norm3 = self.LayerNorm(d_model=d_model)
+        self.norm3 = LayerNorm(d_model=d_model)
         self.dropout3 = nn.Dropout(p=dropout)
 
     def forward(self, dec, enc, trg_mask, src_mask):
