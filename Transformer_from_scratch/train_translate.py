@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
+import os
 import time
 import config
 from transformer import Transformer
-from utils.data_loader import (
+from translation_data_loader import (
     get_batch_indices,
     load_cn_vocab,
     load_en_vocab,
@@ -62,7 +63,7 @@ def main():
 
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), 1)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
             optimizer.step()
 
             if counter % print_interval == 0:
@@ -74,7 +75,9 @@ def main():
                 start_time = time.time()
             counter += 1
 
-    model_path = '../trained/model.pth'
+    model_path = './model/model.pth'
+    if not os.path.exists('model'):
+        os.makedirs('model')
     torch.save(model.state_dict(), model_path)
 
     print(f'Model saved to {model_path}')
