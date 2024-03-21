@@ -15,17 +15,17 @@ max_seq_len = config.max_seq_len
 """
 Data from https://github.com/P3n9W31/transformer-pytorch
 """
-source_train = './data/cn.txt'
-target_train = './data/en.txt'
-source_test = './data/en.test.txt'
-target_test = './data/en.test.txt'
+source_train = './datasets/translation_corpus/cn.txt'
+target_train = './datasets/translation_corpus/en.txt'
+source_test = './datasets/translation_corpus/en.test.txt'
+target_test = './datasets/translation_corpus/en.test.txt'
 
 
 def load_vocab(language):
     assert language in ['cn', 'en']
     vocab = [
         line.split()[0] for line in codecs.open(
-            './data/{}.txt.vocab.tsv'.format(language), 'r', 'utf-8'
+            './datasets/translation_corpus/{}.txt.vocab.tsv'.format(language), 'r', 'utf-8'
         ).read().splitlines()
         if int(line.split()[1]) >= min_cnt
     ]
@@ -106,8 +106,8 @@ def load_test_data():
 
 def get_batch_indices(total_length, batch_size):
     assert (batch_size <= total_length), (
-        'Batch size is large than total data length.' 
-        'Check your data or change batch size.'
+        'Batch size is large than total datasets length.' 
+        'Check your datasets or change batch size.'
     )
 
     current_index = 0
@@ -132,30 +132,3 @@ def idx_to_sentence(arr, vocab, insert_space=False):
         res += word
 
     return res
-
-def download(url, dir, name=None):
-    os.makedirs(dir, exist_ok=True)
-    if name is None:
-        name = url.split('/')[-1]
-    path = os.path.join(dir, name)
-    if not os.path.exists(path):
-        print(f'Install {name} ...')
-        open(path, 'wb').write(requests.get(url).content)
-        print('Install successfully.')
-
-def download_data():
-    data_dir = '../data'
-    urls = [('https://raw.githubusercontent.com/P3n9W31/transformer-pytorch/'
-             'master/corpora/cn.txt'),
-            ('https://raw.githubusercontent.com/P3n9W31/transformer-pytorch/'
-             'master/corpora/en.txt'),
-            ('https://raw.githubusercontent.com/P3n9W31/transformer-pytorch/'
-             'master/preprocessed/cn.txt.vocab.tsv'),
-            ('https://raw.githubusercontent.com/P3n9W31/transformer-pytorch/'
-             'master/preprocessed/en.txt.vocab.tsv')
-            ]
-    for url in urls:
-        download(url, data_dir)
-
-if __name__ == '__main__':
-    download_data()
