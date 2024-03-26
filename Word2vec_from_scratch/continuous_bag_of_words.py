@@ -3,8 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+"""
+Source: https://github.com/FraLotito/pytorch-continuous-bag-of-words/tree/master
+"""
+
 CONTEXT_SIZE = 2  # 2 words to the left, 2 to the right
 EMBEDDING_DIM = 512
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 raw_text = """We are about to study the idea of a computational process.
 Computational processes are abstract beings that inhabit computers.
@@ -60,43 +65,49 @@ class CBOW(nn.Module):
 
 def make_context_vector(context, word_to_idx):
     idxs = [word_to_idx[w] for w in context]
-    return torch.tensor(idxs, dtype=torch.long)
+    return torch.tensor(idxs, dtype=torch.long).to(device)
+
 
 if __name__ == '__main__':
-    model = CBOW(vocab_size=vocab_size, embedding_dim=EMBEDDING_DIM)
+    model = CBOW(vocab_size=vocab_size, embedding_dim=EMBEDDING_DIM).to(device)
     loss_function = nn.NLLLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.001)
 
     # Train
-    for epoch in range(50):
-        total_loss = torch.FloatTensor([0])
+    model.train()
+    for epoch in range(200):
+        total_loss = 0.0
+        optimizer.zero_grad()
 
         for context, target in data:
             context_vector = make_context_vector(context, word_to_idx)
-
             log_probs = model(context_vector)
 
-            total_loss += loss_function(log_probs, torch.LongTensor([word_to_idx[target]]))
+            loss = loss_function(log_probs, torch.tensor([word_to_idx[target]], dtype=torch.long).to(device))
+            loss.backward()
+            total_loss += loss.item()
 
         # optimize at the end of each epoch
-        optimizer.zero_grad()
-        total_loss.backward()
         optimizer.step()
 
+        print(f'Epoch {epoch + 1}: Total Loss = {total_loss:.4f}')
+
     # Test
+    model.eval()
     context = ['People', 'create', 'to', 'direct']
+    # context = ['conjure', 'the', 'of', 'the']
     context_vector = make_context_vector(context, word_to_idx)
     result = model(context_vector)
 
-    print(f'Raw text: {" ".join(raw_text)}\n')
+    print(f'\nRaw text: {" ".join(raw_text)}\n')
     print(f'Context: {context}\n')
     print(f'Prediction: {idx_to_word[torch.argmax(result[0]).item()]}')
 
-    model_state = model.state_dict()
-    embedding_params = model_state['embedding.weight']
-    linear1_params = model_state['linear1.weight'], model_state['linear1.bias']
-    torch.save(embedding_params, '../Transformer_from_scratch/model/embedding_params.pth')
-    torch.save(linear1_params, '../Transformer_from_scratch/model/linear1_params.pth')
+    # model_state = model.state_dict()
+    # embedding_params = model_state['embedding.weight']
+    # linear1_params = model_state['linear1.weight'], model_state['linear1.bias']
+    # torch.save(embedding_params, './model/embedding_params.pth')
+    # torch.save(linear1_params, './model/linear1_params.pth')
 
 
 
