@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-from layers.layer_norm import LayerNorm
-from layers.multi_head_attention import MultiHeadAttention
-from layers.position_wise_feed_forward import PositionWiseFeedForward
+from transformer_from_scratch.layers.layer_norm import LayerNorm
+from transformer_from_scratch.layers.multi_head_attention import MultiHeadAttention
+from transformer_from_scratch.layers.position_wise_feed_forward import PositionWiseFeedForward
 
 
 class DecoderBlock(nn.Module):

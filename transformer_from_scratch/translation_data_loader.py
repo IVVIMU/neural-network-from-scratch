@@ -3,7 +3,6 @@ import codecs
 import random
 import numpy as np
 import regex
-import requests
 import config
 
 

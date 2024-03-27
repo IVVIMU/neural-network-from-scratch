@@ -3,14 +3,14 @@ import torch.nn as nn
 import os
 import time
 import config
-from transformer import Transformer
-from translation_data_loader import (
+from transformer_from_scratch.transformer import Transformer
+from transformer_from_scratch.translation_data_loader import (
     get_batch_indices,
     load_cn_vocab,
     load_en_vocab,
     load_train_data
 )
-from utils.epoch_timer import epoch_time
+from transformer_from_scratch.utils.epoch_timer import epoch_time
 
 
 def main():

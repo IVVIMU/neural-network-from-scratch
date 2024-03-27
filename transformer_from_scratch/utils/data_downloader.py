@@ -14,7 +14,7 @@ def download(url, dir, name=None):
 
 
 def download_data():
-    data_dir = '../datasets/translation_corpus'
+    data_dir = '../../datasets/translation_corpus'
     urls = [
         'https://raw.githubusercontent.com/P3n9W31/transformer-pytorch/master/corpora/cn.txt',
         'https://raw.githubusercontent.com/P3n9W31/transformer-pytorch/master/corpora/en.txt',

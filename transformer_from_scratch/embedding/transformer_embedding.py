@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-# from embedding.token_embedding import TokenEmbedding
-from embedding.positional_encoding import PositionalEncoding
+# from transformer_from_scratch.embedding.token_embedding import TokenEmbedding
+from transformer_from_scratch.embedding.positional_encoding import PositionalEncoding
 
 
 class TransformerEmbedding(nn.Module):
