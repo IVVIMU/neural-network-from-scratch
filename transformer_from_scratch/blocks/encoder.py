@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-from transformer_from_scratch.embedding.transformer_embedding import TransformerEmbedding
 from transformer_from_scratch.blocks.encoder_block import EncoderBlock
 
 
@@ -9,32 +8,27 @@ class Encoder(nn.Module):
 
     def __init__(
             self,
-            src_pad_idx,
-            src_vocab_size,
-            max_seq_len,
             d_model,
-            ffn_hidden,
+            d_ffn,
             n_heads,
             n_layers,
-            dropout,
-            device
+            dropout=0.1,
     ):
-        super().__init__()
-
-        self.emb = TransformerEmbedding(
-            pad_idx=src_pad_idx,
-            vocab_size=src_vocab_size,
-            max_seq_len=max_seq_len,
-            d_model=d_model,
-            dropout=dropout,
-            device=device
-        )
+        """
+        Args:
+            d_model:      dimension of embeddings
+            d_ffn:        dimension of feed-forward network
+            n_heads:      number of heads
+            n_layers:     number of encoder layers
+            dropout:      probability of dropout occurring
+        """
+        super(Encoder, self).__init__()
 
         self.layers = nn.ModuleList(
             [
                 EncoderBlock(
                     d_model=d_model,
-                    ffn_hidden=ffn_hidden,
+                    d_ffn=d_ffn,
                     n_heads=n_heads,
                     dropout=dropout
                 )
@@ -42,10 +36,17 @@ class Encoder(nn.Module):
             ]
         )
 
-    def forward(self, x, src_mask):
-        x = self.emb(x)
+    def forward(self, src, src_mask):
+        """
+        Args:
+            src: embedded sequences (batch_size, seq_len, d_model)
+            src_mask:  mask for the sequences (batch_size, 1, 1, seq_len)
+
+        Returns:
+            enc_out:  sequences after self-attention (batch_size, seq_len, d_model)
+        """
 
         for layer in self.layers:
-            x = layer(x, src_mask)
+            enc_out, attention_probs = layer(src, src_mask)
 
-        return x
+        return enc_out
