@@ -8,38 +8,56 @@ from transformer_from_scratch.layers.position_wise_feed_forward import PositionW
 
 class DecoderBlock(nn.Module):
 
-    def __init__(self, d_model, ffn_hidden, n_heads, dropout):
+    def __init__(self, d_model, d_ffn, n_heads, dropout):
+        """
+        Args:
+            d_model: dimension of embeddings
+            d_ffn: dimension of feed-forward network
+            n_heads: number of heads
+            dropout: probability of dropout occurring
+    """
         super(DecoderBlock, self).__init__()
 
-        self.attention = MultiHeadAttention(d_model=d_model, n_heads=n_heads)
+        self.masked_attention = MultiHeadAttention(d_model=d_model, n_heads=n_heads)
         self.norm1 = LayerNorm(d_model=d_model)
-        self.dropout1 = nn.Dropout(p=dropout)
 
-        self.enc_dec_attention = MultiHeadAttention(d_model=d_model, n_heads=n_heads)
+        self.attention = MultiHeadAttention(d_model=d_model, n_heads=n_heads)
         self.norm2 = LayerNorm(d_model=d_model)
-        self.dropout2 = nn.Dropout(p=dropout)
 
-        self.ffn = PositionWiseFeedForward(d_model=d_model, hidden=ffn_hidden, dropout=dropout)
+        self.ffn = PositionWiseFeedForward(d_model=d_model, d_ffn=d_ffn, dropout=dropout)
         self.norm3 = LayerNorm(d_model=d_model)
-        self.dropout3 = nn.Dropout(p=dropout)
 
-    def forward(self, dec, enc, trg_mask, src_mask):
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, trg, src, trg_mask, src_mask):
+        """
+        Args:
+            trg: embedded sequences (batch_size, trg_seq_len, d_model)
+            src: embedded sequences (batch_size, src_seq_len, d_model)
+            trg_mask: mask for the sequences (batch_size, 1, trg_seq_len, trg_seq_len)
+            src_mask: mask for the sequences (batch_size, 1, 1, src_seq_len)
+
+        Returns:
+            trg: sequences after self-attention (batch_size, trg_seq_len, d_model)
+            attention_probs: self-attention softmax scores (batch_size, n_heads, trg_seq_len, src_seq_len)
+        """
         # 1. compute self attention
-        dec_attention_out = self.attention(q=dec, k=dec, v=dec, mask=trg_mask)
+        attention_out, attention_probs = self.masked_attention(q=trg, k=trg, v=trg, mask=trg_mask)
 
-        # 2. add and norm
-        norm1_out = self.dropout1(self.norm1(dec_attention_out + dec))
+        # 2. residual add and norm
+        norm1_out = self.norm1(trg + self.dropout(attention_out))
+        trg = norm1_out
 
         # 3. compute encoder-decoder attention
-        enc_dec_attention_out = self.enc_dec_attention(q=norm1_out, k=enc, v=enc, mask=src_mask)
+        enc_dec_attention_out, attention_probs = self.attention(q=trg, k=src, v=src, mask=src_mask)
 
         # 4. add and norm
-        norm2_out = self.dropout2(self.norm2(enc_dec_attention_out + norm1_out))
+        norm2_out = self.norm2(trg + self.dropout(enc_dec_attention_out))
 
         # 5. position-wise feed forward network
         ffn_out = self.ffn(norm2_out)
 
-        # 6. add and norm
-        norm3_out = self.dropout3(self.norm3(ffn_out + norm2_out))
+        # 6. residual add and norm
+        out = self.norm3(norm2_out + self.dropout(ffn_out))
 
-        return norm3_out
+        return out, attention_probs
