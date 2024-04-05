@@ -16,11 +16,11 @@ class Encoder(nn.Module):
     ):
         """
         Args:
-            d_model:      dimension of embeddings
-            d_ffn:        dimension of feed-forward network
-            n_heads:      number of heads
-            n_layers:     number of encoder layers
-            dropout:      probability of dropout occurring
+            d_model: dimension of embeddings
+            d_ffn: dimension of feed-forward network
+            n_heads: number of heads
+            n_layers: number of encoder layers
+            dropout: probability of dropout occurring
         """
         super(Encoder, self).__init__()
 
@@ -40,13 +40,16 @@ class Encoder(nn.Module):
         """
         Args:
             src: embedded sequences (batch_size, seq_len, d_model)
-            src_mask:  mask for the sequences (batch_size, 1, 1, seq_len)
+            src_mask: mask for the sequences (batch_size, 1, 1, seq_len)
 
         Returns:
-            enc_out:  sequences after self-attention (batch_size, seq_len, d_model)
+            enc_out: sequences after self-attention (batch_size, seq_len, d_model)
+            attention_probs: self-attention softmax scores (batch_size, n_heads, src_seq_len, src_seq_len)
         """
 
         for layer in self.layers:
             enc_out, attention_probs = layer(src, src_mask)
+
+        self.attention_probs = attention_probs
 
         return enc_out
