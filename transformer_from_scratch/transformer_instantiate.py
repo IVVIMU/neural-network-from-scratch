@@ -17,7 +17,7 @@ def transformer(
         n_layers,
         device,
         dropout=0.1,
-        max_seq_len=5000
+        max_seq_len=50
 ):
     """
     Construct a model when provided parameters.

@@ -8,7 +8,7 @@ class PositionalEncoding(nn.Module):
     compute positional encoding
     """
 
-    def __init__(self, d_model, max_seq_len=5000, dropout=0.1):
+    def __init__(self, d_model, max_seq_len=50, dropout=0.1):
         """
         Args:
             d_model: dimension of embeddings
@@ -45,6 +45,6 @@ class PositionalEncoding(nn.Module):
         Returns:
             embeddings + positional encodings (batch_size, seq_len, d_model)
         """
-        x = x + self.positional_encoding[:, : x.size(1)].requires_grad_(False)  # # don't need to compute gradient
+        x = x + self.positional_encoding[:, :x.size(1)].requires_grad_(False)  # # don't need to compute gradient
 
         return self.dropout(x)

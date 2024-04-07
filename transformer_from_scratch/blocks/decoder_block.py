@@ -42,7 +42,7 @@ class DecoderBlock(nn.Module):
             attention_probs: self-attention softmax scores (batch_size, n_heads, trg_seq_len, src_seq_len)
         """
         # 1. compute self attention
-        attention_out, attention_probs = self.masked_attention(q=trg, k=trg, v=trg, mask=trg_mask)
+        attention_out, masked_attention_probs = self.masked_attention(q=trg, k=trg, v=trg, mask=trg_mask)
 
         # 2. residual add and norm
         norm1_out = self.norm1(trg + self.dropout(attention_out))
@@ -60,4 +60,4 @@ class DecoderBlock(nn.Module):
         # 6. residual add and norm
         out = self.norm3(norm2_out + self.dropout(ffn_out))
 
-        return out, attention_probs
+        return out, masked_attention_probs, attention_probs

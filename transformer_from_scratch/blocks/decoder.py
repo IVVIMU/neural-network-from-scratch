@@ -51,10 +51,12 @@ class Decoder(nn.Module):
         Returns:
             output: sequences after decoder (batch_size, trg_seq_len, vocab_size)
             attention_probs: self-attention softmax scores (batch_size, n_heads, trg_seq_len, src_seq_len)
+            masked_attention_probs: masked attention scores (batch_size, n_heads, trg_seq_len, trg_seq_len)
         """
         for layer in self.layers:
-            trg, attention_probs = layer(trg, src, trg_mask, src_mask)
+            trg, masked_attention_probs, attention_probs = layer(trg, src, trg_mask, src_mask)
 
+        self.masked_attention_probs = masked_attention_probs
         self.attention_probs = attention_probs
 
         dec_out = self.w_o(trg)
