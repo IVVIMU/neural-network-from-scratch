@@ -1,3 +1,7 @@
+"""
+Reference: https://medium.com/@karuneshu21/how-to-resnet-in-pytorch-9acb01f36cf5
+"""
+
 from resnet_from_scratch.resnet import ResNet
 
 # resnetX = (Num of channels, repetition, Bottleneck_expansion, Bottleneck_layer)
